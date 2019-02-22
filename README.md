@@ -9,36 +9,41 @@ Features that were important to us are:
 4. Merging
 
 ## Usage
+
 ```go
 import https://github.com/LeadsOnDemand/pipeline
 ```
+
 ### Create a pipeline
 You create a pipeline by calling pipeline.New() passing in a function with the signature
+
 ```go
 func(context.Context) (<-chan interface{}, func() error)
 ```
+
 #### Simple example pipeline seeded with 10 numbers
+
 ```go
 seed := func(ctx context.Context, in <-chan interface{}) (<-chan interface{}, func() error) {
-		out := MakeGenericChannel()
-		return out, func() error {
-			defer func() {
-				close(out)
-			}()
-			for i := range in {
-				value, valueError := intercept(i.(int))
-				if valueError != nil {
-					return valueError
-				}
-				select {
-				case <-ctx.Done():
-					return nil
-				case out <- value:
-				}
-			}
-			return nil
-		}
-	}
+        out := MakeGenericChannel()
+        return out, func() error {
+            defer func() {
+                close(out)
+            }()
+            for i := range in {
+                value, valueError := intercept(i.(int))
+                if valueError != nil {
+                    return valueError
+                }
+                select {
+                case <-ctx.Done():
+                    return nil
+                case out <- value:
+                }
+            }
+            return nil
+        }
+    }
 pipeline := pipeline.new(seed)
 ```
 
@@ -47,37 +52,37 @@ We read input data and translate it
 
 ```go
 seedFactory := func(in *os.File) pipeline.Seed {
-		reader := bufio.NewReader(in)
-		fmt.Println("Simple Shell")
-		fmt.Println("---------------------")
-		return func(ctx context.Context) (<-chan interface{}, func() error) {
-			out := pipeline.MakeGenericChannel()
-			return out, func() error {
-				defer close(out)
-				for {
-					fmt.Print("-> ")
-					select {
-					// return when canceled
-					case <-ctx.Done():
-					default:
-						text, _ := reader.ReadString('\n')
-						// convert CRLF to LF
-						out <- strings.Replace(text, "\n", "", -1)
-					}
-				}
-				return nil
-			}
-		}
-	}
+        reader := bufio.NewReader(in)
+        fmt.Println("Simple Shell")
+        fmt.Println("---------------------")
+        return func(ctx context.Context) (<-chan interface{}, func() error) {
+            out := pipeline.MakeGenericChannel()
+            return out, func() error {
+                defer close(out)
+                for {
+                    fmt.Print("-> ")
+                    select {
+                    // return when canceled
+                    case <-ctx.Done():
+                    default:
+                        text, _ := reader.ReadString('\n')
+                        // convert CRLF to LF
+                        out <- strings.Replace(text, "\n", "", -1)
+                    }
+                }
+                return nil
+            }
+        }
+    }
 
-	p := pipeline.New(seedFactory(os.Stdin), context.Background())
+    p := pipeline.New(seedFactory(os.Stdin), context.Background())
 
-	translator := func(ctx context.Context, in <-chan interface{}) (<-chan interface{}, func() error) {
-		out := pipeline.MakeGenericChannel()
-		return out, func() error {
-			// clean up when done
-			defer close(out)
-			for i := range in {
+    translator := func(ctx context.Context, in <-chan interface{}) (<-chan interface{}, func() error) {
+        out := pipeline.MakeGenericChannel()
+        return out, func() error {
+            // clean up when done
+            defer close(out)
+            for i := range in {
         select {
         case <- ctx.Done():
           return nil
@@ -91,25 +96,25 @@ seedFactory := func(in *os.File) pipeline.Seed {
           // send the output to our next stage
           out <- translation
         }
-			}
-			return nil
-		}
-	}
+            }
+            return nil
+        }
+    }
   p.Stage(translator)
-	sink := func(ctx context.Context, in <-chan interface{}) (interface{}, error) {
-		transcript := ""
-		for i := range in {
-			select {
-			case <-ctx.Done():
-				return transcript, nil
-			default:
-				transcript = transcript + i.(string) + "\n"
-				fmt.Println(i)
-			}
-		}
-		return transcript, nil
-	}
+    sink := func(ctx context.Context, in <-chan interface{}) (interface{}, error) {
+        transcript := ""
+        for i := range in {
+            select {
+            case <-ctx.Done():
+                return transcript, nil
+            default:
+                transcript = transcript + i.(string) + "\n"
+                fmt.Println(i)
+            }
+        }
+        return transcript, nil
+    }
 
-	p.Sink(sink)
+    p.Sink(sink)
 
 ```
