@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -74,13 +75,17 @@ func TestPipelineError(t *testing.T) {
 
 func TestPipelineSplit(t *testing.T) {
 	numPipes := 200
-	numItems := 10
+	numItems := 500
 	pipeline := New(seedTestFactory(numItems, passthrough), context.Background())
 	stageErr := pipeline.Stage(double)
 	assert.Nil(t, stageErr, "should create double stage")
 	pipelines, splitErr := pipeline.Split(numPipes)
 	assert.NoError(t, splitErr, "split the pipeline")
 	var wg sync.WaitGroup
+	expected := make([]int, numItems)
+	for i := 0; i < numItems; i++ {
+		expected[i] = i * 2
+	}
 	wg.Add(numPipes)
 	for i := 0; i < numPipes; i++ {
 		go func(item int) {
@@ -88,7 +93,7 @@ func TestPipelineSplit(t *testing.T) {
 			pipelines[item].Sink(results)
 			pipelineResults, sinkErr := pipelines[item].Result()
 			assert.Nil(t, sinkErr, "should create sink stage")
-			assert.Equal(t, []int{0, 2, 4, 6, 8, 10, 12, 14, 16, 18}, pipelineResults)
+			assert.Equal(t, expected, pipelineResults)
 		}(i)
 	}
 	wg.Wait()
@@ -120,7 +125,6 @@ func TestPipelineSplitError(t *testing.T) {
 	wg.Wait()
 }
 
-// does not work
 func TestPipelineSplitErrorSplit(t *testing.T) {
 	pipeline := New(seedTestFactory(10, passthrough), context.Background())
 	stageErr := pipeline.Stage(double)
@@ -411,6 +415,10 @@ func double(ctx context.Context, in <-chan interface{}) (<-chan interface{}, fun
 func results(ctx context.Context, in <-chan interface{}) (interface{}, error) {
 	var results []int
 	for i := range in {
+		// we had a bug where a seeding function for a split would close the channel early and exit
+		// not allowing the channel to be flushed, But this was masked when all stages ran at the same rate
+		// by adding this timeout at the end it forced the issue to occur every run.
+		time.Sleep(1000)
 		select {
 		case <-ctx.Done():
 			return results, nil

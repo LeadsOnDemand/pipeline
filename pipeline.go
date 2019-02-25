@@ -11,14 +11,15 @@ import (
 type Cancel func(error)
 
 type Pipeline struct {
-	cancel  context.CancelFunc
-	parents []*Pipeline
-	result  interface{}
-	err     error
-	next    <-chan interface{}
-	context context.Context
-	group   *errgroup.Group
-	wg      *sync.WaitGroup
+	cancel    context.CancelFunc
+	parents   []*Pipeline
+	result    interface{}
+	err       error
+	next      <-chan interface{}
+	context   context.Context
+	group     *errgroup.Group
+	wg        *sync.WaitGroup
+	numStages int
 }
 
 type Seed func(context.Context) (<-chan interface{}, func() error)
@@ -27,19 +28,14 @@ type Stage func(context.Context, <-chan interface{}) (<-chan interface{}, func()
 
 type Sink func(context.Context, <-chan interface{}) (interface{}, error)
 
-var closedchan = make(chan struct{})
-
-func init() {
-	close(closedchan)
-}
-
 func New(seed Seed, ctx context.Context) *Pipeline {
 	ctx, cancel := context.WithCancel(ctx)
 	g, ctx := errgroup.WithContext(ctx)
 	p := Pipeline{
-		cancel:  cancel,
-		context: ctx,
-		group:   g,
+		cancel:    cancel,
+		context:   ctx,
+		group:     g,
+		numStages: 1,
 	}
 	out, fn := seed(ctx)
 	p.next = out
@@ -75,11 +71,13 @@ func (p *Pipeline) Stage(stage Stage) error {
 	}
 	out, fn := stage(p.context, p.next)
 	p.next = out
+	p.numStages++
 	p.group.Go(fn)
 	return nil
 }
 
 func (p *Pipeline) Sink(sink Sink) error {
+	defer p.cancel()
 	if p.next == nil {
 		return errors.New("Cannot add another sink")
 	}
@@ -140,18 +138,25 @@ func (p *Pipeline) Split(numPipelines int) ([]*Pipeline, error) {
 	return pipelines, nil
 }
 
+func (p *Pipeline) MakeGenericChannel(capacity ...int) chan interface{} {
+	if capacity != nil && len(capacity) >= 1 {
+		return make(chan interface{}, capacity[0]+p.numStages)
+	}
+	return MakeGenericChannel(p.numStages)
+}
+
 func splitSeedFactory(in chan interface{}, cancel context.CancelFunc) Seed {
 	return func(ctx context.Context) (<-chan interface{}, func() error) {
 		out := MakeGenericChannel()
 		return out, func() error {
-			defer func(){
-				close(out)
-				cancel()
-			}()
+			defer close(out)
 			for i := range in {
 				select {
 				case out <- i:
 				case <-ctx.Done():
+					// stop the parent to avoid a deadlock
+					// since the child will read the parent in case of an error
+					cancel()
 					return nil
 				}
 			}
@@ -168,8 +173,6 @@ func closeChannels(chs ...chan interface{}) {
 
 func fanoutSinkFactory(wg *sync.WaitGroup, chs ...chan interface{}) Sink {
 	return func(ctx context.Context, in <-chan interface{}) (interface{}, error) {
-		defer func() {
-		}()
 		for i := range in {
 			select {
 			case <-ctx.Done():

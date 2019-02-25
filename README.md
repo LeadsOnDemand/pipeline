@@ -11,7 +11,9 @@ Features that were important to us are:
 ## Usage
 
 ```go
-import https://github.com/LeadsOnDemand/pipeline
+import (
+    "github.com/LeadsOnDemand/pipeline"
+)
 ```
 
 ### Create a pipeline
