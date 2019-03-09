@@ -1,0 +1,13 @@
+version: 0.2
+
+env:
+  variables:
+    GO111MODULE: "on"
+
+phases:
+  install:
+    commands:
+      - go get ...
+  pre_build:
+    commands:
+      - make test
