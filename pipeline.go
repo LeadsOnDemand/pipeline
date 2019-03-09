@@ -127,9 +127,9 @@ func (p *Pipeline) Split(numPipelines int) ([]*Pipeline, error) {
 	wg.Add(numPipelines)
 	chs := make([]chan interface{}, numPipelines)
 	for i := 0; i < numPipelines; i++ {
-		ch := MakeGenericChannel()
+		ch := p.MakeGenericChannel()
 		chs[i] = ch
-		pipe := New(splitSeedFactory(ch, p.cancel), p.context)
+		pipe := New(splitSeedFactory(ch, p.cancel, p.numStages), p.context)
 		pipe.parents = []*Pipeline{p}
 		pipe.wg = &wg
 		pipelines[i] = pipe
@@ -145,9 +145,13 @@ func (p *Pipeline) MakeGenericChannel(capacity ...int) chan interface{} {
 	return MakeGenericChannel(p.numStages)
 }
 
-func splitSeedFactory(in chan interface{}, cancel context.CancelFunc) Seed {
+func (p *Pipeline) GetNumStages(capacity ...int) int {
+	return p.numStages
+}
+
+func splitSeedFactory(in chan interface{}, cancel context.CancelFunc, buffer int) Seed {
 	return func(ctx context.Context) (<-chan interface{}, func() error) {
-		out := MakeGenericChannel()
+		out := MakeGenericChannel(buffer)
 		return out, func() error {
 			defer close(out)
 			for i := range in {

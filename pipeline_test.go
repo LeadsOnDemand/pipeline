@@ -99,6 +99,36 @@ func TestPipelineSplit(t *testing.T) {
 	wg.Wait()
 }
 
+func TestPipelineSplitWithStage(t *testing.T) {
+	numPipes := 200
+	numItems := 500
+	pipeline := New(seedTestFactory(numItems, passthrough), context.Background())
+	stageErr := pipeline.Stage(double)
+	assert.Nil(t, stageErr, "should create double stage")
+	pipelines, splitErr := pipeline.Split(numPipes)
+	assert.NoError(t, splitErr, "split the pipeline")
+	for _, pip := range pipelines {
+		pip.Stage(double)
+	}
+	var wg sync.WaitGroup
+	expected := make([]int, numItems)
+	for i := 0; i < numItems; i++ {
+		expected[i] = i * 2 *2
+	}
+	wg.Add(numPipes)
+	for _, pip := range pipelines {
+		pip := pip
+		go func() {
+			defer wg.Done()
+			pip.Sink(results)
+			pipelineResults, sinkErr := pip.Result()
+			assert.Nil(t, sinkErr, "should create sink stage")
+			assert.Equal(t, expected, pipelineResults)
+		}()
+	}
+	wg.Wait()
+}
+
 func TestPipelineSplitError(t *testing.T) {
 	pipeline := New(seedTestFactory(10, passthrough), context.Background())
 	pipeline.Stage(stageFactory(func(i int) (int, error) {

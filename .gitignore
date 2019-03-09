@@ -12,3 +12,6 @@
 *.out
 
 on
+
+trace/m.trace
+trace/main
