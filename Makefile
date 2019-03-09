@@ -1,6 +1,3 @@
-clean:
-	rm trace/main
-	rm trace/m.trace
 build:
 	go build -o trace/main trace/main.go
 tracer: build
@@ -10,3 +7,6 @@ test:
 	go test
 time: build
 	time ./trace/main > /dev/null
+clean:
+	rm trace/main
+	rm trace/m.trace
