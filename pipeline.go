@@ -8,8 +8,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type Cancel func(error)
-
+// Pipeline struct
 type Pipeline struct {
 	cancel    context.CancelFunc
 	parents   []*Pipeline
@@ -22,13 +21,17 @@ type Pipeline struct {
 	numStages int
 }
 
+// Seed function type
 type Seed func(context.Context) (<-chan interface{}, func() error)
 
+// Stage function type
 type Stage func(context.Context, <-chan interface{}) (<-chan interface{}, func() error)
 
+// Sink function type
 type Sink func(context.Context, <-chan interface{}) (interface{}, error)
 
-func New(seed Seed, ctx context.Context) *Pipeline {
+// New creates a new pipeline
+func New(ctx context.Context, seed Seed) *Pipeline {
 	ctx, cancel := context.WithCancel(ctx)
 	g, ctx := errgroup.WithContext(ctx)
 	p := Pipeline{
@@ -43,7 +46,8 @@ func New(seed Seed, ctx context.Context) *Pipeline {
 	return &p
 }
 
-func Merge(pipelines []*Pipeline, ctx context.Context) (*Pipeline, error) {
+// Merge multiple pipelines into one
+func Merge(ctx context.Context, pipelines []*Pipeline) (*Pipeline, error) {
 	chs := make([]chan interface{}, len(pipelines))
 	for i, pipeline := range pipelines {
 		if pipeline.next == nil {
@@ -52,11 +56,12 @@ func Merge(pipelines []*Pipeline, ctx context.Context) (*Pipeline, error) {
 		chs[i] = MakeGenericChannel()
 		go pipeline.Sink(syncSinkFactory(chs[i]))
 	}
-	p := New(faninSeedFactory(chs, pipelines), ctx)
+	p := New(ctx, faninSeedFactory(chs, pipelines))
 	p.parents = pipelines
 	return p, nil
 }
 
+// Result returns the result of a pipeline
 func (p *Pipeline) Result() (interface{}, error) {
 	if p.next != nil {
 		return nil, errors.New("Sink has not been called")
@@ -65,6 +70,7 @@ func (p *Pipeline) Result() (interface{}, error) {
 	return p.result, p.err
 }
 
+// Stage a new function in the pipeline
 func (p *Pipeline) Stage(stage Stage) error {
 	if p.next == nil {
 		return errors.New("Cannot add stage after sink")
@@ -76,6 +82,7 @@ func (p *Pipeline) Stage(stage Stage) error {
 	return nil
 }
 
+// Sink the pipeline, this must be your last stage
 func (p *Pipeline) Sink(sink Sink) error {
 	defer p.cancel()
 	if p.next == nil {
@@ -113,6 +120,7 @@ func (p *Pipeline) Sink(sink Sink) error {
 	return nil
 }
 
+//Split a pipeline into multiple pipelines
 func (p *Pipeline) Split(numPipelines int) ([]*Pipeline, error) {
 	if p.next == nil {
 		return nil, errors.New("Cannot split after sink")
@@ -129,7 +137,7 @@ func (p *Pipeline) Split(numPipelines int) ([]*Pipeline, error) {
 	for i := 0; i < numPipelines; i++ {
 		ch := p.MakeGenericChannel()
 		chs[i] = ch
-		pipe := New(splitSeedFactory(ch, p.cancel, p.numStages), p.context)
+		pipe := New(p.context, splitSeedFactory(ch, p.cancel, p.numStages))
 		pipe.parents = []*Pipeline{p}
 		pipe.wg = &wg
 		pipelines[i] = pipe
@@ -138,6 +146,7 @@ func (p *Pipeline) Split(numPipelines int) ([]*Pipeline, error) {
 	return pipelines, nil
 }
 
+// MakeGenericChannel will make an interface and appropriate buffer length
 func (p *Pipeline) MakeGenericChannel(capacity ...int) chan interface{} {
 	if capacity != nil && len(capacity) >= 1 {
 		return make(chan interface{}, capacity[0]+p.numStages)
@@ -145,6 +154,7 @@ func (p *Pipeline) MakeGenericChannel(capacity ...int) chan interface{} {
 	return MakeGenericChannel(p.numStages)
 }
 
+//GetNumStages returns the number of stages in the pipeline
 func (p *Pipeline) GetNumStages(capacity ...int) int {
 	return p.numStages
 }
@@ -261,6 +271,7 @@ func faninSeedFactory(chs []chan interface{}, parents []*Pipeline) Seed {
 	}
 }
 
+// MakeGenericChannel creates a gneric channel
 func MakeGenericChannel(capacity ...int) chan interface{} {
 	if capacity != nil && len(capacity) >= 1 {
 		return make(chan interface{}, capacity[0])

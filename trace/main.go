@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime/trace"
 	"sync"
 
@@ -10,16 +11,16 @@ import (
 )
 
 func main() {
-	// terr := trace.Start(os.Stdout)
-	// if terr != nil {
-	// 	panic(terr)
-	// }
+	terr := trace.Start(os.Stdout)
+	if terr != nil {
+		panic(terr)
+	}
 	defer trace.Stop()
 	numItems := 1000
-	numStages := 100
+	numStages := 1000
 	numPipes := 100
 
-	p := pipeline.New(func(ctx context.Context) (<-chan interface{}, func() error) {
+	p := pipeline.New(context.Background(), func(ctx context.Context) (<-chan interface{}, func() error) {
 		out := pipeline.MakeGenericChannel()
 		return out, func() error {
 			defer close(out)
@@ -28,7 +29,7 @@ func main() {
 			}
 			return nil
 		}
-	}, context.Background())
+	})
 
 	var pipes []*pipeline.Pipeline
 
