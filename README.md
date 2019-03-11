@@ -1,4 +1,5 @@
 # Pipeline
+![Build Status](https://codebuild.us-east-1.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiSHRiRUZndUhuSHBpb1FyRE5KNS8rSHNzcnJRKzZqZllyaDM0bHZOSXVsdTlVLzNpMTF1YzEvdXlHNWprYWFlTTdEYStUcUI5b1ZFcXZNVXREQlVuVi93PSIsIml2UGFyYW1ldGVyU3BlYyI6ImZqcDJ5RnVUempXZzVMQUEiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=master)
 
 ## Purpose
 This project was inspired by [The Go Blog](https://blog.golang.org/pipelines) and [Pipeline Patterns in Go by Claudio Fahey](https://medium.com/statuscode/pipeline-patterns-in-go-a37bb3a7e61d). We wanted to build a library that we could use "seed" our pipeline, set up as many "stages" as we wanted, than add a "sink" to manage our results. We wanted a library that would manage linking our stages together and manage the lifecycle of our channels and goroutines.

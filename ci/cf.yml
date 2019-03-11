@@ -1,16 +1,12 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: pipeline codebuild
-Parameters:
-  GitRepo:
-    Type: String
-  GitBranch:
-    Type: String
-  GitSecret:
-    Type: String
-  GitToken:
-    Type: String
-  GitOwner:
-    Type: String
+# Parameters:
+#   GitRepo:
+#     Type: String
+#   GitBranch:
+#     Type: String
+#   GitOwner:
+#     Type: String
 
 Resources:
   # Role to build build enviornment infrustructure
@@ -43,6 +39,7 @@ Resources:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Sub ${AWS::StackName}-BuildPipeline
+      BadgeEnabled: true
       Description: Test and build pipeline
       ServiceRole: !GetAtt BuildRole.Arn
       Environment:
@@ -51,5 +48,9 @@ Resources:
         Image: golang
         #Image: aws/codebuild/golang:1.11
       Source:
-        Type: CODEPIPELINE
+        Type: GITHUB
+        Location: https://github.com/LeadsOnDemand/pipeline.git
+        ReportBuildStatus: true
         BuildSpec: ci/buildspec.yml
+      Artifacts:
+        Type: NO_ARTIFACTS
