@@ -3,19 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
-	"runtime/trace"
 	"sync"
 
 	"github.com/LeadsOnDemand/pipeline"
 )
 
 func main() {
-	terr := trace.Start(os.Stdout)
-	if terr != nil {
-		panic(terr)
-	}
-	defer trace.Stop()
+	// terr := trace.Start(os.Stdout)
+	// if terr != nil {
+	// 	panic(terr)
+	// }
+	// defer trace.Stop()
 	numItems := 1000
 	numStages := 1000
 	numPipes := 100
@@ -45,7 +43,7 @@ func main() {
 
 	passthrough := func(p *pipeline.Pipeline) pipeline.Stage {
 		return func(ctx context.Context, in <-chan interface{}) (<-chan interface{}, func() error) {
-			out := p.MakeGenericChannel()
+			out := pipeline.MakeGenericChannel()
 			return out, func() error {
 				defer close(out)
 				for i := range in {

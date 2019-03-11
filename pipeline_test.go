@@ -1,4 +1,4 @@
-package pipeline
+package pipeline_test
 
 import (
 	"context"
@@ -7,19 +7,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LeadsOnDemand/pipeline"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNoStagePipeline(t *testing.T) {
-	pipeline := New(seedTestFactory(10, passthrough), context.Background())
+	pipeline := pipeline.New(context.Background(), seedTestFactory(10, passthrough))
 	pipeline.Sink(results)
 	pipelineResults, sinkErr := pipeline.Result()
 	assert.Nil(t, sinkErr, "should create sink stage")
 	assert.Equal(t, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, pipelineResults)
+	assert.Equal(t, pipeline.GetNumStages(), 1)
 }
 
 func TestPipeline(t *testing.T) {
-	pipeline := New(seedTestFactory(10, passthrough), context.Background())
+	pipeline := pipeline.New(context.Background(), seedTestFactory(10, passthrough))
 	stageErr := pipeline.Stage(double)
 	assert.Nil(t, stageErr, "should create double stage")
 	pipeline.Sink(results)
@@ -29,7 +31,7 @@ func TestPipeline(t *testing.T) {
 }
 
 func TestPipelineMultipleStages(t *testing.T) {
-	pipeline := New(seedTestFactory(10, passthrough), context.Background())
+	pipeline := pipeline.New(context.Background(), seedTestFactory(10, passthrough))
 	stageErr := pipeline.Stage(double)
 	numStages := 100
 	for i := 0; i < numStages; i++ {
@@ -44,7 +46,7 @@ func TestPipelineMultipleStages(t *testing.T) {
 
 func TestPipelineCancelation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	pipeline := New(seedTestFactory(10, passthrough), ctx)
+	pipeline := pipeline.New(ctx, seedTestFactory(10, passthrough))
 	pipeline.Stage(stageFactory(func(i int) (int, error) {
 		if i > 5 {
 			cancel()
@@ -58,7 +60,7 @@ func TestPipelineCancelation(t *testing.T) {
 	assert.True(t, len(pipelineResults.([]int)) < 10)
 }
 func TestPipelineError(t *testing.T) {
-	pipeline := New(seedTestFactory(10, passthrough), context.Background())
+	pipeline := pipeline.New(context.Background(), seedTestFactory(10, passthrough))
 	pipeline.Stage(stageFactory(func(i int) (int, error) {
 		if i > 5 {
 			return i, errors.New("Value greater than 5")
@@ -76,7 +78,7 @@ func TestPipelineError(t *testing.T) {
 func TestPipelineSplit(t *testing.T) {
 	numPipes := 200
 	numItems := 500
-	pipeline := New(seedTestFactory(numItems, passthrough), context.Background())
+	pipeline := pipeline.New(context.Background(), seedTestFactory(numItems, passthrough))
 	stageErr := pipeline.Stage(double)
 	assert.Nil(t, stageErr, "should create double stage")
 	pipelines, splitErr := pipeline.Split(numPipes)
@@ -102,7 +104,7 @@ func TestPipelineSplit(t *testing.T) {
 func TestPipelineSplitWithStage(t *testing.T) {
 	numPipes := 200
 	numItems := 500
-	pipeline := New(seedTestFactory(numItems, passthrough), context.Background())
+	pipeline := pipeline.New(context.Background(), seedTestFactory(numItems, passthrough))
 	stageErr := pipeline.Stage(double)
 	assert.Nil(t, stageErr, "should create double stage")
 	pipelines, splitErr := pipeline.Split(numPipes)
@@ -113,7 +115,7 @@ func TestPipelineSplitWithStage(t *testing.T) {
 	var wg sync.WaitGroup
 	expected := make([]int, numItems)
 	for i := 0; i < numItems; i++ {
-		expected[i] = i * 2 *2
+		expected[i] = i * 2 * 2
 	}
 	wg.Add(numPipes)
 	for _, pip := range pipelines {
@@ -130,7 +132,7 @@ func TestPipelineSplitWithStage(t *testing.T) {
 }
 
 func TestPipelineSplitError(t *testing.T) {
-	pipeline := New(seedTestFactory(10, passthrough), context.Background())
+	pipeline := pipeline.New(context.Background(), seedTestFactory(10, passthrough))
 	pipeline.Stage(stageFactory(func(i int) (int, error) {
 		if i > 5 {
 			return i, errors.New("Value greater than 5")
@@ -156,7 +158,7 @@ func TestPipelineSplitError(t *testing.T) {
 }
 
 func TestPipelineSplitErrorSplit(t *testing.T) {
-	pipeline := New(seedTestFactory(10, passthrough), context.Background())
+	pipeline := pipeline.New(context.Background(), seedTestFactory(10, passthrough))
 	stageErr := pipeline.Stage(double)
 	assert.Nil(t, stageErr, "should create double stage")
 	numPipes := 5
@@ -187,7 +189,7 @@ func TestPipelineSplitErrorSplit(t *testing.T) {
 
 func TestPipelineSplitCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	pipeline := New(seedTestFactory(10, passthrough), ctx)
+	pipeline := pipeline.New(ctx, seedTestFactory(10, passthrough))
 	pipeline.Stage(stageFactory(func(i int) (int, error) {
 		if i > 5 {
 			cancel()
@@ -215,7 +217,7 @@ func TestPipelineSplitCancel(t *testing.T) {
 
 func TestPipelineSplitCancelSplit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	pipeline := New(seedTestFactory(10, passthrough), ctx)
+	pipeline := pipeline.New(ctx, seedTestFactory(10, passthrough))
 	stageErr := pipeline.Stage(double)
 	assert.Nil(t, stageErr, "should create double stage")
 	numPipes := 5
@@ -244,13 +246,13 @@ func TestPipelineSplitCancelSplit(t *testing.T) {
 func TestPipelineMerge(t *testing.T) {
 	numPipes := 100
 	numItems := 100
-	var pipelines []*Pipeline
+	var pipelines []*pipeline.Pipeline
 	for i := 0; i < numPipes; i++ {
-		pipelines = append(pipelines, New(seedTestFactory(numItems, passthrough), context.Background()))
+		pipelines = append(pipelines, pipeline.New(context.Background(), seedTestFactory(numItems, passthrough)))
 		stageErr := pipelines[i].Stage(double)
 		assert.Nil(t, stageErr, "should create double stage")
 	}
-	pipeline, mergeErr := Merge(pipelines, context.Background())
+	pipeline, mergeErr := pipeline.Merge(context.Background(), pipelines)
 	assert.Nil(t, mergeErr, "should create merge pipeline")
 	pipeline.Sink(results)
 	pipelineResults, sinkErr := pipeline.Result()
@@ -262,9 +264,9 @@ func TestPipelineMergeCancelPipeline(t *testing.T) {
 	numPipes := 100
 	numItems := 100
 	ctx, cancel := context.WithCancel(context.Background())
-	var pipelines []*Pipeline
+	var pipelines []*pipeline.Pipeline
 	for i := 0; i < numPipes; i++ {
-		pipelines = append(pipelines, New(seedTestFactory(numItems, passthrough), ctx))
+		pipelines = append(pipelines, pipeline.New(ctx, seedTestFactory(numItems, passthrough)))
 		pipelines[i].Stage(stageFactory(func(item int) (int, error) {
 			if item > 5 {
 				cancel()
@@ -275,7 +277,7 @@ func TestPipelineMergeCancelPipeline(t *testing.T) {
 		stageErr := pipelines[i].Stage(double)
 		assert.Nil(t, stageErr, "should create double stage")
 	}
-	pipeline, mergeErr := Merge(pipelines, context.Background())
+	pipeline, mergeErr := pipeline.Merge(context.Background(), pipelines)
 	assert.Nil(t, mergeErr, "should create merge pipeline")
 	pipeline.Sink(results)
 	pipelineResults, sinkErr := pipeline.Result()
@@ -287,10 +289,10 @@ func TestPipelineMergeCancelSinglePipeline(t *testing.T) {
 	numPipes := 100
 	numItems := 100
 	ctx, cancel := context.WithCancel(context.Background())
-	var pipelines []*Pipeline
+	var pipelines []*pipeline.Pipeline
 	for i := 0; i < numPipes; i++ {
 		i := i
-		pipelines = append(pipelines, New(seedTestFactory(numItems, passthrough), ctx))
+		pipelines = append(pipelines, pipeline.New(ctx, seedTestFactory(numItems, passthrough)))
 		pipelines[i].Stage(stageFactory(func(item int) (int, error) {
 			if item > 5 && i == 5 {
 				cancel()
@@ -301,7 +303,7 @@ func TestPipelineMergeCancelSinglePipeline(t *testing.T) {
 		stageErr := pipelines[i].Stage(double)
 		assert.Nil(t, stageErr, "should create double stage")
 	}
-	pipeline, mergeErr := Merge(pipelines, context.Background())
+	pipeline, mergeErr := pipeline.Merge(context.Background(), pipelines)
 	assert.Nil(t, mergeErr, "should create merge pipeline")
 	pipeline.Sink(results)
 	pipelineResults, sinkErr := pipeline.Result()
@@ -313,13 +315,13 @@ func TestPipelineMergeCancelMerge(t *testing.T) {
 	numPipes := 3
 	numItems := 100
 	ctx, cancel := context.WithCancel(context.Background())
-	var pipelines []*Pipeline
+	var pipelines []*pipeline.Pipeline
 	for i := 0; i < numPipes; i++ {
-		pipelines = append(pipelines, New(seedTestFactory(numItems, passthrough), context.Background()))
+		pipelines = append(pipelines, pipeline.New(context.Background(), seedTestFactory(numItems, passthrough)))
 		stageErr := pipelines[i].Stage(double)
 		assert.Nil(t, stageErr, "should create double stage")
 	}
-	pipeline, mergeErr := Merge(pipelines, ctx)
+	pipeline, mergeErr := pipeline.Merge(ctx, pipelines)
 	assert.Nil(t, mergeErr, "should create merge pipeline")
 	canceled := false
 	pipeline.Stage(stageFactory(func(item int) (int, error) {
@@ -339,9 +341,9 @@ func TestPipelineMergeCancelMerge(t *testing.T) {
 func TestPipelineMergeErrorPipeline(t *testing.T) {
 	numPipes := 100
 	numItems := 100
-	var pipelines []*Pipeline
+	var pipelines []*pipeline.Pipeline
 	for i := 0; i < numPipes; i++ {
-		pipelines = append(pipelines, New(seedTestFactory(numItems, passthrough), context.Background()))
+		pipelines = append(pipelines, pipeline.New(context.Background(), seedTestFactory(numItems, passthrough)))
 		pipelines[i].Stage(stageFactory(func(item int) (int, error) {
 			if item > 5 {
 				return item, errors.New("Value greater than 5")
@@ -351,7 +353,7 @@ func TestPipelineMergeErrorPipeline(t *testing.T) {
 		stageErr := pipelines[i].Stage(double)
 		assert.Nil(t, stageErr, "should create double stage")
 	}
-	pipeline, mergeErr := Merge(pipelines, context.Background())
+	pipeline, mergeErr := pipeline.Merge(context.Background(), pipelines)
 	assert.Nil(t, mergeErr, "should create merge pipeline")
 	pipeline.Sink(results)
 	pipelineResults, sinkErr := pipeline.Result()
@@ -362,10 +364,10 @@ func TestPipelineMergeErrorPipeline(t *testing.T) {
 func TestPipelineMergeErrorOnePipeline(t *testing.T) {
 	numPipes := 100
 	numItems := 100
-	var pipelines []*Pipeline
+	var pipelines []*pipeline.Pipeline
 	for i := 0; i < numPipes; i++ {
 		i := i
-		pipelines = append(pipelines, New(seedTestFactory(numItems, passthrough), context.Background()))
+		pipelines = append(pipelines, pipeline.New(context.Background(), seedTestFactory(numItems, passthrough)))
 		pipelines[i].Stage(stageFactory(func(item int) (int, error) {
 			if item > 2 && i == 1 {
 				return item, errors.New("Value greater than 5")
@@ -375,7 +377,7 @@ func TestPipelineMergeErrorOnePipeline(t *testing.T) {
 		stageErr := pipelines[i].Stage(double)
 		assert.Nil(t, stageErr, "should create double stage")
 	}
-	pipeline, mergeErr := Merge(pipelines, context.Background())
+	pipeline, mergeErr := pipeline.Merge(context.Background(), pipelines)
 	assert.Nil(t, mergeErr, "should create merge pipeline")
 	pipeline.Sink(results)
 	pipelineResults, sinkErr := pipeline.Result()
@@ -386,13 +388,13 @@ func TestPipelineMergeErrorOnePipeline(t *testing.T) {
 func TestPipelineMergeErrorMerge(t *testing.T) {
 	numPipes := 1
 	numItems := 100
-	var pipelines []*Pipeline
+	var pipelines []*pipeline.Pipeline
 	for i := 0; i < numPipes; i++ {
-		pipelines = append(pipelines, New(seedTestFactory(numItems, passthrough), context.Background()))
+		pipelines = append(pipelines, pipeline.New(context.Background(), seedTestFactory(numItems, passthrough)))
 		stageErr := pipelines[i].Stage(double)
 		assert.Nil(t, stageErr, "should create double stage")
 	}
-	pipeline, mergeErr := Merge(pipelines, context.Background())
+	pipeline, mergeErr := pipeline.Merge(context.Background(), pipelines)
 	assert.Nil(t, mergeErr, "should create merge pipeline")
 	pipeline.Stage(stageFactory(func(item int) (int, error) {
 		if item > 5 {
@@ -406,9 +408,9 @@ func TestPipelineMergeErrorMerge(t *testing.T) {
 	assert.True(t, len(pipelineResults.([]int)) < numItems*numPipes)
 }
 
-func seedTestFactory(num int, intercept func(int) (int, error)) Seed {
+func seedTestFactory(num int, intercept func(int) (int, error)) pipeline.Seed {
 	return func(ctx context.Context) (<-chan interface{}, func() error) {
-		out := MakeGenericChannel()
+		out := pipeline.MakeGenericChannel()
 		return out, func() error {
 			defer close(out)
 			for i := 0; i < num; i++ {
@@ -428,7 +430,7 @@ func seedTestFactory(num int, intercept func(int) (int, error)) Seed {
 }
 
 func double(ctx context.Context, in <-chan interface{}) (<-chan interface{}, func() error) {
-	out := MakeGenericChannel()
+	out := pipeline.MakeGenericChannel()
 	return out, func() error {
 		defer close(out)
 		for i := range in {
@@ -459,9 +461,9 @@ func results(ctx context.Context, in <-chan interface{}) (interface{}, error) {
 	return results, nil
 }
 
-func stageFactory(intercept func(int) (int, error)) Stage {
+func stageFactory(intercept func(int) (int, error)) pipeline.Stage {
 	return func(ctx context.Context, in <-chan interface{}) (<-chan interface{}, func() error) {
-		out := MakeGenericChannel()
+		out := pipeline.MakeGenericChannel()
 		return out, func() error {
 			defer func() {
 				close(out)

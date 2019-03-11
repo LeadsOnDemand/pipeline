@@ -78,10 +78,10 @@ seedFactory := func(in *os.File) pipeline.Seed {
         }
     }
 
-    p := pipeline.New(seedFactory(os.Stdin), context.Background())
+    p := pipeline.New(context.Background(), seedFactory(os.Stdin))
 
     translator := func(ctx context.Context, in <-chan interface{}) (<-chan interface{}, func() error) {
-        out := pipeline.MakeGenericChannel()
+        out := p.MakeGenericChannel()
         return out, func() error {
             // clean up when done
             defer close(out)
@@ -120,4 +120,27 @@ seedFactory := func(in *os.File) pipeline.Seed {
 
     p.Sink(sink)
 
+```
+
+### Performance
+Pipeline provided two methods of creating a "generic channel" which is simply `chan interface{}`.
+1. pipeline.MakeGenericChannel - this will create an unbuffered channel
+2. p.MakeGenericChannel where p is an instance of Pipeline. When using the instance method of MakeGenericChannel we will create a buffered channel with the buffer amount defined by the number of stages. If we have 3 stages we would have seed->{}->{}{}->{}{}{}. Since we have three stages we can seed up to three items before our final stage is full and two items before our second and one before our first. Our pipeline buffer will not block until all buffers in all stages are full, 6 items total, given there are no consumers.
+
+If the production does not need to be controlled by the consumption it is recommended that you use the instance method of MakeGenericChannel as your code will not block for long.
+
+#### Performance time results
+On a 2017 MacBook Pro i7 16GB ram pushing 1000 integers through 1000 stages for 100 pipelines
+With instance method MakeGenericChannel
+```bash
+real    0m5.073s
+user    0m36.481s
+sys     0m0.902s
+```
+
+With static method MakeGenericChannel
+```bash
+real    0m11.651s
+user    1m28.406s
+sys     0m0.539s
 ```
