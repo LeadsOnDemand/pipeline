@@ -13,7 +13,7 @@ Features that were important to us are:
 
 ```go
 import (
-    "github.com/LeadsOnDemand/pipeline"
+    "github.com/kazzcade/pipeline"
 )
 ```
 
