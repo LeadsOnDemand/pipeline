@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LeadsOnDemand/pipeline"
+	"github.com/kazzcade/pipeline"
 	"github.com/stretchr/testify/assert"
 )
 
