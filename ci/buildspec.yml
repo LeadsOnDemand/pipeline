@@ -5,6 +5,9 @@ env:
     GO111MODULE: "on"
 
 phases:
+  install:
+    runtime-versions:
+      golang: 1.13
   pre_build:
     commands:
       - make test
