@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/LeadsOnDemand/pipeline"
+	"github.com/kazzcade/pipeline"
 )
 
 func main() {
